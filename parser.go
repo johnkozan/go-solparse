@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 )
 
 type Node interface{}
@@ -16,10 +17,14 @@ type ContractDefinition struct {
 }
 
 // Declaration represents a solidity variable decleration
-type DeclarationStatement struct {
-	Type      string
-	Name      string
-	Modifiers []string // public, private, const, etc
+type VariableDeclaration struct {
+	Type            string
+	Identifier      Token
+	Value           string
+	IsStateVariable bool
+	IsIndexed       bool
+	IsDeclaredConst bool
+	Location        string
 }
 
 // Parser represents a parser.
@@ -64,27 +69,66 @@ func (p *Parser) parseContractDefination(isLib bool) (cd *ContractDefinition, er
 		return
 	}
 
-	//
 	// if next token -> `is`, loop through and parseInheritance()
-	//
-	//
-	// expect LEFT_BRACE
-	//
-	// Loop while true
-	//
-	//   if RIGHT BRACE, Break!
-	//
-	//   if function, parseFunctionDifintion
-	//
-	//   if struct, parseStructDefinition
-	//
-	//   if enum, parseEnumDefinition
-	//
-	//   if Identifier, Mapping, or Elem. type
-	//     -> parseVariableDeclaration;
-	//        expect SEMICOLON
-	//
-	//
+
+	_, _, err = p.expectToken(LBRACE)
+	if err != nil {
+		return
+	}
+
+outer:
+	for {
+		ct, _ := p.scanIgnoreWhitespace()
+		log.Println(ct)
+		switch ct {
+		case RBRACE:
+			break outer
+		case FUNCTION:
+			return cd, errors.New("function not yet implemented")
+		case STRUCT:
+			return cd, errors.New("struct not yet implemented")
+		case ENUM:
+			return cd, errors.New("enum not yet implemented")
+		case IDENT, MAPPING, ELEM:
+			vd, err := p.parseVariableDeclaration()
+			if err != nil {
+				return cd, err
+			}
+			cd.SubNodes = append(cd.SubNodes, vd)
+			_, _, err = p.expectToken(SEMICOLON)
+			if err != nil {
+				return cd, err
+			}
+		case MODIFIER:
+			return cd, errors.New("modifier not yet implemented")
+		case EVENT:
+			return cd, errors.New("event not yet implemented")
+		case USING:
+			return cd, errors.New("using not yet implemented")
+		default:
+			return cd, errors.New("Function, variable, struct or modifier declaration expected")
+		}
+	}
+	return
+}
+
+func (p *Parser) parseVariableDeclaration() (v VariableDeclaration, err error) {
+	// first check const, indexed, storage, memory, etc
+	//for {
+	//tok, lit := p.currentToken
+
+	// if isVariableVisibilitySpecifier(tok) -> set v.Visibility
+	// else
+	//   if INDEXED -> set Indexed
+	//   else if CONST -> set Const
+	//   else if isLocationSpecifier -> set location
+	//   else break
+	//break
+	//}
+
+	// if allowEmptyName && currentToken != IDENT { identifier = "" }
+
+	v.Identifier, _, err = p.expectIdentifier()
 	return
 }
 

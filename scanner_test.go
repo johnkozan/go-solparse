@@ -18,6 +18,7 @@ func TestScanner_Scan(t *testing.T) {
 		{s: ` `, tok: WS, lit: " "},
 		{s: "\t", tok: WS, lit: "\t"},
 		{s: "\n", tok: WS, lit: "\n"},
+		{s: ";", tok: SEMICOLON, lit: ";"},
 
 		// Identifiers
 		{s: `foo`, tok: IDENT, lit: `foo`},

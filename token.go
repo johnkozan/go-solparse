@@ -13,10 +13,22 @@ const (
 
 	// Misc characters
 	COMMA
+	LBRACE
+	RBRACE
+	SEMICOLON
 
 	// Keywords
 	PRAGMA
 	IMPORT
 	CONTRACT
 	LIBRARY
+
+	FUNCTION
+	STRUCT
+	ENUM
+	MAPPING
+	ELEM
+	MODIFIER
+	EVENT
+	USING
 )

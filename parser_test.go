@@ -1,38 +1,33 @@
 package solparse
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 )
 
 // Ensure the parser can parse strings into ASTs.
-func TestParser_ParseContract(t *testing.T) {
+func TestParser(t *testing.T) {
 	var tests = []struct {
-		s    string
-		stmt *ContractDefinition
-		err  string
+		name   string
+		source string
+		valid  bool
+		fn     func(ContractDefinition, *testing.T)
 	}{
-		// Empty contract
 		{
-			s: `contract TestContract {}`,
-			stmt: &ContractDefinition{
-				Name:      "TestContract",
-				IsLibrary: false,
-			},
+			name: "smoke_test",
+			source: `contract test {
+			uint256 stateVariable1;
+		}`,
+			valid: true,
 		},
-
-		// Errors
-		{s: `foo`, err: `Expected import directive or contract definition`},
 	}
 
-	for i, tt := range tests {
-		stmt, err := NewParser(strings.NewReader(tt.s)).Parse()
-		if !reflect.DeepEqual(tt.err, errstring(err)) {
-			t.Errorf("%d. %q: error mismatch:\n  exp=%s\n  got=%s\n\n", i, tt.s, tt.err, err)
-		} else if tt.err == "" && !reflect.DeepEqual(tt.stmt, stmt) {
-			t.Errorf("%d. %q\n\nstmt mismatch:\n\nexp=%#v\n\ngot=%#v\n\n", i, tt.s, tt.stmt, stmt)
+	for _, tt := range tests {
+		_, err := NewParser(strings.NewReader(tt.source)).Parse()
+		if tt.valid && err != nil {
+			t.Errorf("%s should be valid got: %s\n\n", tt.name, errstring(err))
 		}
+		// if has fn, call it
 	}
 }
 

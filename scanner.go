@@ -36,10 +36,14 @@ func (s *Scanner) Scan() (tok Token, lit string) {
 	switch ch {
 	case eof:
 		return EOF, ""
-
 	case ',':
 		return COMMA, string(ch)
-
+	case ';':
+		return SEMICOLON, string(ch)
+	case '{':
+		return LBRACE, string(ch)
+	case '}':
+		return RBRACE, string(ch)
 	}
 
 	return ILLEGAL, string(ch)
@@ -90,6 +94,14 @@ func (s *Scanner) scanIdent() (tok Token, lit string) {
 	switch strings.ToUpper(buf.String()) {
 	case "CONTRACT":
 		return CONTRACT, buf.String()
+	case "FUNCTION":
+		return FUNCTION, buf.String()
+	case "STRUCT":
+		return STRUCT, buf.String()
+	case "ENUM":
+		return ENUM, buf.String()
+	case "UINT256":
+		return ELEM, buf.String()
 	}
 
 	// Otherwise return as a regular identifier.
