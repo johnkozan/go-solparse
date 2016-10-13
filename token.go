@@ -10,12 +10,16 @@ const (
 
 	// Literals
 	IDENT
+	STRINGLIT
+	NUMBER
 
 	// Misc characters
 	COMMA
 	LBRACE
 	RBRACE
 	SEMICOLON
+	LPAREN
+	RPAREN
 
 	// Keywords
 	PRAGMA
@@ -31,4 +35,12 @@ const (
 	MODIFIER
 	EVENT
 	USING
+	VAR
+	BREAK
 )
+
+var tokLit = []string{"ILLEGAL", "EOF", "<whitespace>", "Identifier", "String literal", "Number", ",", "{", "}", ";", "(", ")",
+	"pragma", "import", "contract", "library", "function", "struct", "enum", "mapping", "Type", "modifier",
+	"event", "using", "var", "break"}
+
+func (t Token) String() string { return tokLit[t] }
