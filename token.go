@@ -242,7 +242,7 @@ var tokenLiterals = []struct {
 	{"as", 0},
 	{"assembly", 0},
 	{"break", 0},
-	{"const", 0},
+	{"constant", 0},
 	{"continue", 0},
 	{"contract", 0},
 	{"default", 0},

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"strings"
 )
 
 // Solidity scanner
@@ -45,25 +44,17 @@ func (s *Scanner) Scan() (tok Token, lit string) {
 	// Otherwise read the individual character
 	switch ch {
 	case eof:
-		return EOF, ""
-	case ',':
-		return COMMA, string(ch)
-	case ';':
-		return SEMICOLON, string(ch)
-	case '(':
-		return LPAREN, string(ch)
-	case ')':
-		return RPAREN, string(ch)
-	case '{':
-		return LBRACE, string(ch)
-	case '}':
-		return RBRACE, string(ch)
+		return EOS, ""
 	case '"', '\'':
 		s.unread()
 		return s.scanString()
+	default:
+		tok, lit := stringToToken(string(ch))
+		if tok != Identifier {
+			return tok, lit
+		}
 	}
-
-	return ILLEGAL, string(ch)
+	return Illegal, string(ch)
 }
 
 // scanWhitespace consumes the current rune and all contiguous whitespace.
@@ -85,7 +76,7 @@ func (s *Scanner) scanWhitespace() (tok Token, lit string) {
 		}
 	}
 
-	return WS, s.buf.String()
+	return Whitespace, s.buf.String()
 }
 
 // scanIdent consumes the current rune and all contiguous ident runes.
@@ -107,54 +98,19 @@ func (s *Scanner) scanIdent() (tok Token, lit string) {
 		}
 	}
 
-	//If the string matches a keyword then return that keyword.
-	switch strings.ToUpper(s.buf.String()) {
-	case "BREAK":
-		return BREAK, s.buf.String()
-	case "CONSTANT":
-		return CONST, s.buf.String()
-	case "CONTRACT":
-		return CONTRACT, s.buf.String()
-	case "ENUM":
-		return ENUM, s.buf.String()
-	case "EXTERNAL":
-		return EXTERNAL, s.buf.String()
-	case "FOR":
-		return FOR, s.buf.String()
-	case "FUNCTION":
-		return FUNCTION, s.buf.String()
-	case "IF":
-		return IF, s.buf.String()
-	case "INTERNAL":
-		return INTERNAL, s.buf.String()
-	case "PAYABLE":
-		return PAYABLE, s.buf.String()
-	case "PRIVATE":
-		return PRIVATE, s.buf.String()
-	case "PUBLIC":
-		return PUBLIC, s.buf.String()
-	case "RETURN":
-		return RETURN, s.buf.String()
-	case "RETURNS":
-		return RETURNS, s.buf.String()
-	case "STRUCT":
-		return STRUCT, s.buf.String()
-	case "WHILE":
-		return WHILE, s.buf.String()
-	}
-
-	// Otherwise return as a regular identifier.
-	return IDENT, s.buf.String()
+	return stringToToken(s.buf.String())
 }
 
+type NumberKind int
+
+const (
+	DecimalKind NumberKind = iota
+	HexKind
+	BinaryKind
+)
+
 func (s *Scanner) scanNumber() (tok Token, lit string) {
-	type NumberKind int
-	const (
-		DECIMAL = iota
-		HEX
-		BINARY
-	)
-	kind := DECIMAL
+	kind := DecimalKind
 
 	// Create a buffer and read the current character into it.
 	s.buf = bytes.Buffer{}
@@ -172,7 +128,7 @@ func (s *Scanner) scanNumber() (tok Token, lit string) {
 	//}
 	//}
 
-	if kind == DECIMAL {
+	if kind == DecimalKind {
 		// scan all digits
 		for {
 			if ch := s.read(); ch == eof {
@@ -188,7 +144,7 @@ func (s *Scanner) scanNumber() (tok Token, lit string) {
 	// scan exponent, if any
 	// do some check for not identifier or decimal
 
-	return NUMBER, s.buf.String()
+	return Number, s.buf.String()
 }
 
 func (s *Scanner) scanString() (tok Token, lit string) {
@@ -203,7 +159,7 @@ func (s *Scanner) scanString() (tok Token, lit string) {
 		}
 		// Handle "\\"
 	}
-	return STRINGLIT, s.buf.String()
+	return StringLiteral, s.buf.String()
 }
 
 func (s *Scanner) read() rune {

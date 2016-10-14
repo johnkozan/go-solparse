@@ -19,22 +19,23 @@ func TestScanner_Scan(t *testing.T) {
 		exp []tc
 	}{
 		{"test empty", "", []tc{
-			tc{"currentToken", EOF},
+			tc{"currentToken", EOS},
 		}},
+
 		{"smoke test", "function break;765  \t  \"string1\",'string2'\nidentifier1", []tc{
-			tc{"currentToken", FUNCTION},
-			tc{"next", BREAK},
-			tc{"next", SEMICOLON},
-			tc{"next", NUMBER},
+			tc{"currentToken", Function},
+			tc{"next", Break},
+			tc{"next", Semicolon},
+			tc{"next", Number},
 			tc{"currentLiteral", "765"},
-			tc{"next", STRINGLIT},
+			tc{"next", StringLiteral},
 			tc{"currentLiteral", "string1"},
-			tc{"next", COMMA},
-			tc{"next", STRINGLIT},
+			tc{"next", Comma},
+			tc{"next", StringLiteral},
 			tc{"currentLiteral", "string2"},
-			tc{"next", IDENT},
+			tc{"next", Identifier},
 			tc{"currentLiteral", "identifier1"},
-			tc{"currentToken", EOF},
+			tc{"currentToken", EOS},
 		}},
 	}
 
