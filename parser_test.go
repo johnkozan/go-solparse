@@ -17,16 +17,20 @@ func TestParser(t *testing.T) {
 			name: "smoke test",
 			source: `contract test {
 			uint256 stateVariable1;
-		}`,
+		}
+		`,
 			valid: true,
 		},
+
 		{
 			name: "missing variable name in declaration",
 			source: `contract test {
 			uint256 ;
-		}`,
+		}
+		`,
 			valid: false,
 		},
+
 		{
 			name: "empty function",
 			source: `contract test {
@@ -34,8 +38,48 @@ func TestParser(t *testing.T) {
 			function functionName(bytes20 arg1, address addr) constant
 			  returns (int id)
 			  { }
-		}`,
+		}
+		`,
 			valid: true,
+		},
+
+		{
+			name: "single function param",
+			source: `contract test {
+			uint256 stateVar;
+			function functionName(bytes32 input) returns (bytes32 out) {}
+		}
+		`,
+			valid: true,
+		},
+
+		{
+			name: "function no body",
+			source: `contract test {
+			function functionName(bytes32 input) returns (bytes32 out);
+		 }
+		`,
+			valid: true,
+		},
+
+		{
+			name: "missing parameter name in named args",
+			source: `contract test {
+		    function a(uint a, uint b, uint c) returns (uint r) { r = a * 100 + b * 10 + c * 1; }
+			function b() returns (uint r) { r = a({: 1, : 2, : 3}); }
+	    }
+		`,
+			valid: false,
+		},
+
+		{
+			name: "missing argument in named args",
+			source: `contract test {
+		    function a(uint a, uint b, uint c) returns (uint r) { r = a * 100 + b * 10 + c * 1; }
+			function b() returns (uint r) { r = a({a: , b: , c: }); }
+		}
+		`,
+			valid: false,
 		},
 	}
 
