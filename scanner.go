@@ -111,16 +111,36 @@ func (s *Scanner) scanIdent() (tok Token, lit string) {
 	switch strings.ToUpper(s.buf.String()) {
 	case "BREAK":
 		return BREAK, s.buf.String()
+	case "CONSTANT":
+		return CONST, s.buf.String()
 	case "CONTRACT":
 		return CONTRACT, s.buf.String()
-	case "FUNCTION":
-		return FUNCTION, s.buf.String()
-	case "STRUCT":
-		return STRUCT, s.buf.String()
 	case "ENUM":
 		return ENUM, s.buf.String()
-	case "UINT256":
-		return ELEM, s.buf.String()
+	case "EXTERNAL":
+		return EXTERNAL, s.buf.String()
+	case "FOR":
+		return FOR, s.buf.String()
+	case "FUNCTION":
+		return FUNCTION, s.buf.String()
+	case "IF":
+		return IF, s.buf.String()
+	case "INTERNAL":
+		return INTERNAL, s.buf.String()
+	case "PAYABLE":
+		return PAYABLE, s.buf.String()
+	case "PRIVATE":
+		return PRIVATE, s.buf.String()
+	case "PUBLIC":
+		return PUBLIC, s.buf.String()
+	case "RETURN":
+		return RETURN, s.buf.String()
+	case "RETURNS":
+		return RETURNS, s.buf.String()
+	case "STRUCT":
+		return STRUCT, s.buf.String()
+	case "WHILE":
+		return WHILE, s.buf.String()
 	}
 
 	// Otherwise return as a regular identifier.
