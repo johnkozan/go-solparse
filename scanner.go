@@ -210,10 +210,10 @@ func (s *Scanner) scanUnicode(cp *rune) bool {
 func (s *Scanner) scanHexByte() bool {
 	b := bytes.Buffer{}
 
-	ch := s.read()
+	var ch rune
 	for i := 0; i < 2; i++ {
-		b.WriteRune(ch)
 		ch = s.read()
+		b.WriteRune(ch)
 	}
 	str, err := hex.DecodeString(b.String())
 	if err != nil {

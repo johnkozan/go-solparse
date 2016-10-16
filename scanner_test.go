@@ -43,6 +43,12 @@ func TestScanner_Scan(t *testing.T) {
 			{"next", StringLiteral},
 			{"currentLiteral", "aa"},
 		}},
+
+		{"string escapes with zeros", "  { \"a\\x61\\x00abc\"", []tc{
+			{"currentToken", LBrace},
+			{"next", StringLiteral},
+			{"currentLiteral", "aa\000abc"},
+		}},
 	}
 
 	for _, tt := range tests {
