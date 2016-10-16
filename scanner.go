@@ -3,6 +3,7 @@ package solparse
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	"io"
 )
 
@@ -46,6 +47,9 @@ func (s *Scanner) Scan() (tok Token, lit string) {
 	case eof:
 		return EOS, ""
 	case '"', '\'':
+		s.unread()
+		return s.scanString()
+	case '\\':
 		s.unread()
 		return s.scanString()
 	default:
@@ -150,16 +154,74 @@ func (s *Scanner) scanNumber() (tok Token, lit string) {
 func (s *Scanner) scanString() (tok Token, lit string) {
 	s.buf = bytes.Buffer{}
 	quote := s.read()
-
-	for {
-		if ch := s.read(); ch == eof || ch == quote || isLineTerminator(ch) {
-			break
+	ch := s.read()
+	for ch != quote && ch != eof && !isLineTerminator(ch) {
+		if ch == '\\' {
+			if !s.scanEscape() {
+				return Illegal, ""
+			}
 		} else {
 			_, _ = s.buf.WriteRune(ch)
 		}
-		// Handle "\\"
+		ch = s.read()
 	}
 	return StringLiteral, s.buf.String()
+}
+
+func (s *Scanner) scanEscape() bool {
+	ch := s.read()
+	if isLineTerminator(ch) {
+		return true
+	}
+
+	switch ch {
+	case '\'', '"', '\\':
+		s.buf.WriteRune(ch)
+	case 'b':
+		s.buf.WriteRune('\b')
+	case 'f':
+		s.buf.WriteRune('\f')
+	case 'n':
+		s.buf.WriteRune('\n')
+	case 'r':
+		s.buf.WriteRune('\r')
+	case 't':
+		s.buf.WriteRune('\t')
+	case 'v':
+		s.buf.WriteRune('\v')
+	case 'u':
+		var codepoint rune
+		if !s.scanUnicode(&codepoint) {
+			return false
+		}
+		s.buf.WriteRune(codepoint)
+	case 'x':
+		if !s.scanHexByte() {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Scanner) scanUnicode(cp *rune) bool {
+	panic("unicode not yet implemented")
+}
+
+func (s *Scanner) scanHexByte() bool {
+	b := bytes.Buffer{}
+
+	ch := s.read()
+	for i := 0; i < 2; i++ {
+		b.WriteRune(ch)
+		ch = s.read()
+	}
+	str, err := hex.DecodeString(b.String())
+	if err != nil {
+		s.rollback(1)
+		return false
+	}
+	s.buf.WriteRune(rune(str[0]))
+	return true
 }
 
 func (s *Scanner) read() rune {
@@ -172,6 +234,11 @@ func (s *Scanner) read() rune {
 
 // unread places the previously read rune back on the reader.
 func (s *Scanner) unread() { _ = s.r.UnreadRune() }
+func (s *Scanner) rollback(i int) {
+	for x := 0; x < i; x++ {
+		_ = s.r.UnreadRune()
+	}
+}
 
 // eof represents a marker rune for the end of the reader.
 var eof = rune(0)
