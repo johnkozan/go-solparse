@@ -82,7 +82,14 @@ func (s *Scanner) scanToken() {
 		case '>':
 			panic("handle >")
 		case '=':
-			panic("handle =")
+			s.advance()
+			if s.char == '=' {
+				tok = s.selectToken(Equal)
+			} else if s.char == '>' {
+				tok = s.selectToken(Arrow)
+			} else {
+				tok = s.selectToken(Assign)
+			}
 		case '!':
 			panic("handle !")
 		case '-':

@@ -60,6 +60,16 @@ func TestScanner_Scan(t *testing.T) {
 			{"next", Illegal},
 			{"next", EOS},
 		}},
+
+		{"hex numbers", "var x = 0x765432536763762734623472346;", []tc{
+			{"currentToken", Var},
+			{"next", Identifier},
+			{"next", Assign},
+			{"next", Number},
+			{"currentLiteral", "0x765432536763762734623472346"},
+			{"next", Semicolon},
+			{"next", EOS},
+		}},
 	}
 
 	for _, tt := range tests {
