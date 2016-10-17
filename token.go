@@ -1,6 +1,9 @@
 package solparse
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 type Token int
 
@@ -333,7 +336,31 @@ var tokenLiterals = []struct {
 	{"ILLEGAL", 0},
 }
 
-func tokenFromIdentifierOrKeyword(lit string) (Token, int, int) {
+func tokenFromIdentifierOrKeyword(lit string) (tok Token, m int, n int) {
+	posM := firstDigitIndex(lit)
+	if posM != 0 {
+		baseType := lit[0:posM]
+		// TODO handle x
+		posX := len(lit)
+		m = stringToInt(lit[posM:posX]) //parseSize(posM, posX)
+		tok = keywordByName(baseType)
+		if tok == Bytes {
+			if 0 < m && m <= 32 { //  && posX == len(lit) {
+				return BytesM, m, 0
+			}
+		} else if tok == Uint || tok == Int {
+			if 0 < m && m <= 256 && m%8 == 0 { // && positionX == _literal.end())
+				if tok == Uint {
+					return UIntM, m, 0
+				} else {
+					return IntM, m, 0
+				}
+			}
+		} else if tok == UFixed || tok == Fixed {
+			panic("fixed not yet implemented")
+		}
+		return Identifier, 0, 0
+	}
 	return keywordByName(lit), 0, 0
 }
 
@@ -377,4 +404,24 @@ func isCountOp(tok Token) bool {
 
 func isElementaryTypeName(tok Token) bool {
 	return Int <= tok && tok < TypesEnd
+}
+
+func tokenPrecedence(tok Token) int { return tokenLiterals[tok].Precedence }
+
+func firstDigitIndex(s string) int {
+	for k, v := range s {
+		if isDecimalDigit(v) {
+			return k
+		}
+	}
+	return 0
+}
+
+func stringToInt(s string) (i int) {
+	var err error
+	i, err = strconv.Atoi(s)
+	if err != nil {
+		panic(err)
+	}
+	return
 }

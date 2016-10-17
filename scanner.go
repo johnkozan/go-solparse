@@ -92,10 +92,26 @@ func (s *Scanner) scanToken() {
 			}
 		case '!':
 			panic("handle !")
+		case '+':
+			s.advance()
+			if s.char == '+' {
+				tok = s.selectToken(Inc)
+			} else if s.char == '=' {
+				tok = s.selectToken(AssignAdd)
+			} else {
+				tok = s.selectToken(Add)
+			}
 		case '-':
 			panic("handle -")
 		case '*':
-			panic("handle *")
+			s.advance()
+			if s.char == '*' {
+				tok = s.selectToken(Exp)
+			} else if s.char == '=' {
+				tok = s.selectToken(AssignMul)
+			} else {
+				tok = s.selectToken(Mul)
+			}
 		case '%':
 			panic("handle mod")
 		case '/':
@@ -389,6 +405,7 @@ func isIdentifierStart(ch rune) bool {
 func isHexDigit(ch rune) bool {
 	return isDecimalDigit(ch) || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
 }
+func isAssignmentOp(tok Token) bool { return Assign <= tok && tok <= AssignMod }
 func isIdentifierPart(ch rune) bool { return isIdentifierStart(ch) || isDecimalDigit(ch) }
 func isWhitespace(ch rune) bool     { return ch == ' ' || ch == '\t' || ch == '\n' }
 func isLetter(ch rune) bool         { return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') }
