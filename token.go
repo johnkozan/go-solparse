@@ -1,9 +1,6 @@
 package solparse
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 type Token int
 
@@ -307,11 +304,11 @@ var tokenLiterals = []struct {
 	{"null", 0},
 	{"true", 0},
 	{"false", 0},
-	{"", 0},
+	{"STRINGLIT", 0},
 	{"", 0},
 	{"", 0},
 
-	{"", 0},
+	{"IDENT", 0},
 
 	{"abstract", 0},
 	{"after", 0},
@@ -333,7 +330,20 @@ var tokenLiterals = []struct {
 	{"typeof", 0},
 	{"view", 0},
 
-	{"", 0},
+	{"ILLEGAL", 0},
+}
+
+func tokenFromIdentifierOrKeyword(lit string) (Token, int, int) {
+	return keywordByName(lit), 0, 0
+}
+
+func keywordByName(n string) Token {
+	for k, v := range tokenLiterals {
+		if v.Name == n {
+			return Token(k)
+		}
+	}
+	return Identifier
 }
 
 func (t Token) String() string { return tokenLiterals[t].Name }
@@ -365,27 +375,6 @@ func isCountOp(tok Token) bool {
 	return tok == Inc || tok == Dec
 }
 
-func isElementaryTypeName(lit string) bool {
-	for _, v := range elementaryTypes {
-		if v == lit {
-			return true
-		}
-	}
-	return false
-}
-
-var elementaryTypes []string
-
-func init() {
-	// Build list of elementary types
-	elementaryTypes = []string{"bool", "string", "int", "uint", "byte", "bytes", "address"}
-	// int, uint by 8 to 256
-	for i := 8; i <= 256; i += 8 {
-		elementaryTypes = append(elementaryTypes, fmt.Sprintf("int%d", i))
-		elementaryTypes = append(elementaryTypes, fmt.Sprintf("uint%d", i))
-	}
-	// bytes by 1 to 32
-	for b := 1; b <= 32; b += 1 {
-		elementaryTypes = append(elementaryTypes, fmt.Sprintf("bytes%d", b))
-	}
+func isElementaryTypeName(tok Token) bool {
+	return Int <= tok && tok < TypesEnd
 }

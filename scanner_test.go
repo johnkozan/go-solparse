@@ -35,7 +35,7 @@ func TestScanner_Scan(t *testing.T) {
 			{"currentLiteral", "string2"},
 			{"next", Identifier},
 			{"currentLiteral", "identifier1"},
-			{"currentToken", EOS},
+			{"next", EOS},
 		}},
 
 		{"string escapes", "  { \"a\\x61\"", []tc{
@@ -49,22 +49,38 @@ func TestScanner_Scan(t *testing.T) {
 			{"next", StringLiteral},
 			{"currentLiteral", "aa\000abc"},
 		}},
+
+		{"string escape illegal", " bla \"\\x6rf\" (illegalescape)", []tc{
+			{"currentToken", Identifier},
+			{"next", Illegal},
+			{"currentLiteral", ""},
+			// TODO: does illegal handling match offical implementation?
+			//{"next", Illegal},
+			{"next", Identifier},
+			{"next", Illegal},
+			{"next", EOS},
+		}},
 	}
 
 	for _, tt := range tests {
 		s := NewScanner(strings.NewReader(tt.s))
 
-		for _, c := range tt.exp {
+		for k, c := range tt.exp {
 			switch c.f {
-			case "currentToken", "next":
-				tok, _ := s.Scan()
+			case "currentToken":
+				tok := s.currentToken()
 				if tok != c.e.(Token) {
-					t.Errorf("%s - Expected to scan token %s got %s", tt.n, c.e, tok)
+					t.Errorf("%s , case: %d -- Expected current token '%s' got '%s'", tt.n, k, c.e, tok)
+				}
+			case "next":
+				tok := s.next()
+				if tok != c.e.(Token) {
+					t.Errorf("%s , case: %d -- Expected next token '%s' got '%s' - literal '%s'", tt.n, k, c.e, tok, s.currentLiteral())
 				}
 			case "currentLiteral":
-				lit := s.CurrentLiteral()
+				lit := s.currentLiteral()
 				if lit != c.e.(string) {
-					t.Errorf("%s - Expected to scan literal %s got %s", tt.n, c.e, lit)
+					t.Errorf("%s , case %d  -- Expected current literal '%s' got '%s'", tt.n, k, c.e, lit)
 				}
 			default:
 				t.Error("invalid test func ", c.f)

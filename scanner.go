@@ -3,106 +3,194 @@ package solparse
 import (
 	"bufio"
 	"bytes"
-	"encoding/hex"
 	"io"
 )
 
 // Solidity scanner
 
 type Scanner struct {
-	r   *bufio.Reader
-	buf bytes.Buffer
+	r       *bufio.Reader
+	curTok  *TokenDesc
+	nextTok *TokenDesc
+	char    rune // 1 character look-ahead
+}
+
+type TokenDesc struct {
+	token    Token
+	location SourceLocation
+	lit      LiteralScope
+	info     ExtendedTokenInfo
+}
+
+type LiteralScope struct {
+	literal  string
+	complete bool
+	buf      bytes.Buffer
+}
+
+type SourceLocation struct {
+	start      int
+	end        int
+	sourceName string
+}
+
+type ExtendedTokenInfo struct {
+	firstSize  int
+	secondSize int
 }
 
 func NewScanner(r io.Reader) *Scanner {
-	return &Scanner{r: bufio.NewReader(r)}
+	s := &Scanner{r: bufio.NewReader(r)}
+	s.reset()
+	return s
 }
 
-// Returns the last scanned literal.  Does not advance the scanner.
-func (s *Scanner) CurrentLiteral() string {
-	return s.buf.String()
-}
-
-// Scan returns the next token and literal value.  Ignores whitespace
-func (s *Scanner) Scan() (tok Token, lit string) {
-	// Read the next rune
-	ch := s.read()
-
-	// If we see whitespace then consume all contiguous whitespace.
-	// If we see a letter then consume as an ident or reserved word
-	if isWhitespace(ch) {
-		s.unread()
-		s.scanWhitespace()
-		return s.Scan()
-	} else if isLetter(ch) {
-		s.unread()
-		return s.scanIdent()
-	} else if isDigit(ch) {
-		s.unread()
-		return s.scanNumber()
+func (s *Scanner) advance() rune {
+	var err error
+	s.char, _, err = s.r.ReadRune()
+	if err != nil {
+		s.char = eof
+		return eof
 	}
-
-	// Otherwise read the individual character
-	switch ch {
-	case eof:
-		return EOS, ""
-	case '"', '\'':
-		s.unread()
-		return s.scanString()
-	case '\\':
-		s.unread()
-		return s.scanString()
-	default:
-		tok, lit := stringToToken(string(ch))
-		if tok != Identifier {
-			return tok, lit
-		}
-	}
-	return Illegal, string(ch)
+	return s.char
 }
 
-// scanWhitespace consumes the current rune and all contiguous whitespace.
-func (s *Scanner) scanWhitespace() (tok Token, lit string) {
-	// Create a buffer and read the current character into it.
-	s.buf = bytes.Buffer{}
-	s.buf.WriteRune(s.read())
+func (s *Scanner) next() Token {
+	s.curTok = s.nextTok
+	s.scanToken()
+	return s.curTok.token
+}
 
-	// Read every subsequent whitespace character into the buffer.
-	// Non-whitespace characters and EOF will cause the loop to exit.
+func (s *Scanner) selectToken(then Token) Token {
+	s.advance()
+	return then
+}
+
+func (s *Scanner) scanToken() {
+	s.nextTok = &TokenDesc{}
+
+	var m, n int
+	var tok Token
 	for {
-		if ch := s.read(); ch == eof {
+		switch s.char {
+		case '\n', ' ', '\t':
+			tok = s.selectToken(Whitespace)
+		case '"', '\'':
+			tok = s.scanString()
+		case '<':
+			panic("handle <")
+		case '>':
+			panic("handle >")
+		case '=':
+			panic("handle =")
+		case '!':
+			panic("handle !")
+		case '-':
+			panic("handle -")
+		case '*':
+			panic("handle *")
+		case '%':
+			panic("handle mod")
+		case '/':
+			panic("handle /")
+		case '&':
+			panic("handle &")
+		case '|':
+			panic("handle |")
+		case '^':
+			panic("handle ^")
+		case '.':
+			panic("handle number")
+		case ':':
+			tok = s.selectToken(Colon)
+		case ';':
+			tok = s.selectToken(Semicolon)
+		case ',':
+			tok = s.selectToken(Comma)
+		case '(':
+			tok = s.selectToken(LParen)
+		case ')':
+			tok = s.selectToken(RParen)
+		case '[':
+			tok = s.selectToken(LBrack)
+		case ']':
+			tok = s.selectToken(RBrack)
+		case '{':
+			tok = s.selectToken(LBrace)
+		case '}':
+			tok = s.selectToken(RBrace)
+		case '?':
+			tok = s.selectToken(Conditional)
+		case '~':
+			tok = s.selectToken(BitNot)
+		default:
+			if isIdentifierStart(s.char) {
+				tok, m, n = s.scanIdentifierOrKeyword()
+				if tok == Hex {
+					m, n = 0, 0
+					if s.char == '"' || s.char == '\'' {
+						tok = s.scanHexString()
+					} else {
+						tok = Illegal
+					}
+				}
+			} else if isDecimalDigit(s.char) {
+				tok = s.scanNumber(s.char)
+			} else if s.char == eof {
+				tok = EOS
+			} else {
+				tok = s.selectToken(Illegal)
+			}
+			// skipWhitespcae ?
+		}
+		if tok != Whitespace {
 			break
-		} else if !isWhitespace(ch) {
-			s.unread()
-			break
-		} else {
-			s.buf.WriteRune(ch)
 		}
 	}
-
-	return Whitespace, s.buf.String()
+	info := ExtendedTokenInfo{firstSize: m, secondSize: n}
+	s.nextTok = &TokenDesc{token: tok, info: info, lit: s.nextTok.lit}
 }
 
-// scanIdent consumes the current rune and all contiguous ident runes.
-func (s *Scanner) scanIdent() (tok Token, lit string) {
-	// Create a buffer and read the current character into it.
-	s.buf = bytes.Buffer{}
-	s.buf.WriteRune(s.read())
-
-	// Read every subsequent ident character into the buffer.
-	// Non-ident characters and EOF will cause the loop to exit.
-	for {
-		if ch := s.read(); ch == eof {
-			break
-		} else if !isLetter(ch) && !isDigit(ch) && ch != '_' {
-			s.unread()
-			break
-		} else {
-			_, _ = s.buf.WriteRune(ch)
-		}
+func (s *Scanner) scanIdentifierOrKeyword() (Token, int, int) {
+	if !isIdentifierStart(s.char) {
+		panic("is not identifier start")
 	}
+	s.addLiteralCharAndAdvance()
+	for isIdentifierPart(s.char) {
+		s.addLiteralCharAndAdvance()
+	}
+	return tokenFromIdentifierOrKeyword(s.nextTok.lit.String())
+}
 
-	return stringToToken(s.buf.String())
+func (s *Scanner) addLiteralCharAndAdvance() {
+	s.addLiteralChar(s.char)
+	s.advance()
+}
+
+func (s *Scanner) scanDecimalDigits() {
+	for isDecimalDigit(s.char) {
+		s.addLiteralCharAndAdvance()
+	}
+}
+
+func (s *Scanner) addLiteralChar(c rune) {
+	s.nextTok.lit.buf.WriteRune(c)
+}
+
+func (s *Scanner) currentToken() Token {
+	return s.curTok.token
+}
+
+func (s *Scanner) currentLiteral() string {
+	return s.curTok.lit.String()
+}
+
+func (s *Scanner) peekNextToken() Token {
+	return s.nextTok.token
+}
+
+func (l LiteralScope) String() string {
+	return l.buf.String()
 }
 
 type NumberKind int
@@ -113,93 +201,118 @@ const (
 	BinaryKind
 )
 
-func (s *Scanner) scanNumber() (tok Token, lit string) {
+func (s *Scanner) scanNumber(charSeen rune) (tok Token) {
 	kind := DecimalKind
+	s.nextTok.lit = LiteralScope{}
 
-	// Create a buffer and read the current character into it.
-	s.buf = bytes.Buffer{}
-	//buf.WriteRune(charSeen)
+	if charSeen == '.' {
+		s.addLiteralChar('.')
+		s.scanDecimalDigits()
+	} else {
+		if charSeen == '0' {
+			s.addLiteralCharAndAdvance()
+			if s.char == 'x' || s.char == 'X' {
+				kind = HexKind
+				s.addLiteralCharAndAdvance()
+				if !isHexDigit(s.char) {
+					return Illegal
+				}
+				for isHexDigit(s.char) {
+					s.addLiteralCharAndAdvance()
+				}
+			}
+		}
 
-	//if charSeen == '.' {
-	// do stuff
-	//} // else {
-	//if charSeen == '0' {
-	//r := s.scan()
-	//buf.WriteRune(r)
-	//if r == 'x' || r == 'X' {
-	//hex
-	//kind = HEX
-	//}
-	//}
-
-	if kind == DecimalKind {
-		// scan all digits
-		for {
-			if ch := s.read(); ch == eof {
-				break
-			} else if !isDigit(ch) && ch != '.' {
-				s.unread()
-				break
-			} else {
-				_, _ = s.buf.WriteRune(ch)
+		if kind == DecimalKind {
+			s.scanDecimalDigits()
+			if s.char == '.' {
+				s.addLiteralCharAndAdvance()
+				s.scanDecimalDigits()
 			}
 		}
 	}
-	// scan exponent, if any
-	// do some check for not identifier or decimal
 
-	return Number, s.buf.String()
+	// scan exponent, if any
+	if s.char == 'e' || s.char == 'E' {
+		if kind != DecimalKind {
+			return Illegal
+		}
+		s.addLiteralCharAndAdvance()
+		if s.char == '+' || s.char == '-' {
+			s.addLiteralCharAndAdvance()
+		}
+		if !isDecimalDigit(s.char) {
+			return Illegal
+		}
+		s.scanDecimalDigits()
+	}
+
+	// The source char immediately following a numberic literal must not be an identifier part or deciaml digit
+	if isDecimalDigit(s.char) || isIdentifierStart(s.char) {
+		return Illegal
+	}
+
+	return Number
 }
 
-func (s *Scanner) scanString() (tok Token, lit string) {
-	s.buf = bytes.Buffer{}
-	quote := s.read()
-	ch := s.read()
-	for ch != quote && ch != eof && !isLineTerminator(ch) {
-		if ch == '\\' {
+func (s *Scanner) scanString() Token {
+	quote := s.char
+	s.nextTok.lit = LiteralScope{}
+	s.advance() // consume quote
+	for s.char != quote && s.char != eof && !isLineTerminator(s.char) {
+		c := s.char
+		s.advance()
+		if c == '\\' {
 			if !s.scanEscape() {
-				return Illegal, ""
+				return Illegal
 			}
 		} else {
-			_, _ = s.buf.WriteRune(ch)
+			s.addLiteralChar(c)
 		}
-		ch = s.read()
 	}
-	return StringLiteral, s.buf.String()
+	if s.char != quote {
+		return Illegal
+	}
+	s.advance()
+	return StringLiteral
 }
 
 func (s *Scanner) scanEscape() bool {
-	ch := s.read()
-	if isLineTerminator(ch) {
+	c := s.char
+	s.advance()
+	if isLineTerminator(c) {
 		return true
 	}
 
-	switch ch {
+	switch c {
 	case '\'', '"', '\\':
-		s.buf.WriteRune(ch)
 	case 'b':
-		s.buf.WriteRune('\b')
+		c = '\b'
 	case 'f':
-		s.buf.WriteRune('\f')
+		c = '\f'
 	case 'n':
-		s.buf.WriteRune('\n')
+		c = '\n'
 	case 'r':
-		s.buf.WriteRune('\r')
+		c = '\r'
 	case 't':
-		s.buf.WriteRune('\t')
+		c = '\t'
 	case 'v':
-		s.buf.WriteRune('\v')
+		c = '\v'
 	case 'u':
-		var codepoint rune
-		if !s.scanUnicode(&codepoint) {
-			return false
-		}
-		s.buf.WriteRune(codepoint)
+		panic("unicode not yet implemted")
+		//var codepoint rune
+		//if !s.scanUnicode(&codepoint) {
+		//return false
+		//}
+		//s.buf.WriteRune(codepoint)
 	case 'x':
-		if !s.scanHexByte() {
+		var ok bool
+		if c, ok = s.scanHexByte(); !ok {
 			return false
 		}
 	}
+
+	s.addLiteralChar(c)
 	return true
 }
 
@@ -207,43 +320,76 @@ func (s *Scanner) scanUnicode(cp *rune) bool {
 	panic("unicode not yet implemented")
 }
 
-func (s *Scanner) scanHexByte() bool {
-	b := bytes.Buffer{}
+func (s *Scanner) scanHexString() Token {
+	panic("hex string not yet implemented")
+}
 
-	var ch rune
+func (s *Scanner) scanHexByte() (rune, bool) {
+	x := 0
 	for i := 0; i < 2; i++ {
-		ch = s.read()
-		b.WriteRune(ch)
+		d := hexValue(s.char)
+		if d < 0 {
+			s.rollback(i)
+			return rune(0), false
+		}
+		x = x*16 + d
+		s.advance()
 	}
-	str, err := hex.DecodeString(b.String())
-	if err != nil {
-		s.rollback(1)
-		return false
-	}
-	s.buf.WriteRune(rune(str[0]))
-	return true
+	return rune(x), true
 }
 
-func (s *Scanner) read() rune {
-	ch, _, err := s.r.ReadRune()
-	if err != nil {
-		return eof
+func (s *Scanner) skipWhitespace() bool {
+	ret := false
+	for isWhitespace(s.char) {
+		ret = true
+		s.advance()
 	}
-	return ch
+	return ret
 }
 
-// unread places the previously read rune back on the reader.
-func (s *Scanner) unread() { _ = s.r.UnreadRune() }
+func (s *Scanner) reset() {
+	// source.reset()
+	var err error
+	s.char, _, err = s.r.ReadRune()
+	if err != nil {
+		s.char = eof
+	}
+	s.skipWhitespace()
+	s.scanToken()
+	s.next()
+}
+
 func (s *Scanner) rollback(i int) {
-	for x := 0; x < i; x++ {
+	if i <= 0 {
+		return
+	}
+	for x := 0; x < i+1; x++ {
 		_ = s.r.UnreadRune()
+	}
+	var err error
+	s.char, _, _ = s.r.ReadRune()
+	if err != nil {
+		s.char = eof
 	}
 }
 
 // eof represents a marker rune for the end of the reader.
-var eof = rune(0)
+var eof = rune(-1)
 
+func isIdentifierStart(ch rune) bool {
+	return ch == '_' || ch == '$' || ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z')
+}
+func isHexDigit(ch rune) bool {
+	return isDecimalDigit(ch) || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
+}
+func isIdentifierPart(ch rune) bool { return isIdentifierStart(ch) || isDecimalDigit(ch) }
 func isWhitespace(ch rune) bool     { return ch == ' ' || ch == '\t' || ch == '\n' }
 func isLetter(ch rune) bool         { return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') }
-func isDigit(ch rune) bool          { return (ch >= '0' && ch <= '9') }
+func isDecimalDigit(ch rune) bool   { return (ch >= '0' && ch <= '9') }
 func isLineTerminator(ch rune) bool { return ch == '\n' }
+func hexValue(ch rune) int {
+	if ch >= '0' && ch <= '9' {
+		return int(ch - '0')
+	}
+	return -1
+}
